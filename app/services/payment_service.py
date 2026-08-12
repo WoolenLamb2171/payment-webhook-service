@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import SUBSCRIPTION_DURATION
 from app.models.payment import Payment
 from app.models.subscription import Subscription
 from app.models.user import User
@@ -15,8 +16,9 @@ class UserNotFoundError(Exception):
 
 
 class PaymentService:
-    @staticmethod
+    @classmethod
     async def process_payment(
+        cls,
         session: AsyncSession,
         payload: PaymentWebhook,
     ) -> dict:
@@ -27,56 +29,90 @@ class PaymentService:
             }
 
         async with session.begin():
-            user = await session.scalar(
-                select(User).where(User.id == payload.user_id)
+            await cls._validate_user(
+                session=session,
+                user_id=payload.user_id,
             )
 
-            if user is None:
-                raise UserNotFoundError
-
-            payment_statement = (
-                insert(Payment)
-                .values(
-                    payment_id=payload.payment_id,
-                    user_id=payload.user_id,
-                    amount=payload.amount,
-                    status=payload.status.value,
-                )
-                .on_conflict_do_nothing(
-                    index_elements=[Payment.payment_id],
-                )
-                .returning(Payment.id)
+            created_payment_id = await cls._create_payment(
+                session=session,
+                payload=payload,
             )
-
-            result = await session.execute(payment_statement)
-            created_payment_id = result.scalar_one_or_none()
 
             if created_payment_id is None:
                 return {
                     "status": "already_processed",
                 }
 
-            expires_at = datetime.now(timezone.utc) + timedelta(days=30)
-
-            subscription_statement = (
-                insert(Subscription)
-                .values(
-                    user_id=payload.user_id,
-                    status="active",
-                    expires_at=expires_at,
-                )
-                .on_conflict_do_update(
-                    index_elements=[Subscription.user_id],
-                    set_={
-                        "status": "active",
-                        "expires_at": expires_at,
-                    },
-                )
+            await cls._activate_subscription(
+                session=session,
+                user_id=payload.user_id,
             )
-
-            await session.execute(subscription_statement)
 
         return {
             "status": "processed",
             "payment_id": payload.payment_id,
         }
+
+    @classmethod
+    async def _validate_user(
+        cls,
+        session: AsyncSession,
+        user_id: int,
+    ) -> None:
+        user = await session.scalar(
+            select(User).where(User.id == user_id)
+        )
+
+        if user is None:
+            raise UserNotFoundError
+
+    @classmethod
+    async def _create_payment(
+        cls,
+        session: AsyncSession,
+        payload: PaymentWebhook,
+    ) -> int | None:
+        statement = (
+            insert(Payment)
+            .values(
+                payment_id=payload.payment_id,
+                user_id=payload.user_id,
+                amount=payload.amount,
+                status=payload.status.value,
+            )
+            .on_conflict_do_nothing(
+                index_elements=[Payment.payment_id],
+            )
+            .returning(Payment.id)
+        )
+
+        result = await session.execute(statement)
+
+        return result.scalar_one_or_none()
+
+    @classmethod
+    async def _activate_subscription(
+        cls,
+        session: AsyncSession,
+        user_id: int,
+    ) -> None:
+        expires_at = datetime.now(timezone.utc) + SUBSCRIPTION_DURATION
+
+        statement = (
+            insert(Subscription)
+            .values(
+                user_id=user_id,
+                status="active",
+                expires_at=expires_at,
+            )
+            .on_conflict_do_update(
+                index_elements=[Subscription.user_id],
+                set_={
+                    "status": "active",
+                    "expires_at": expires_at,
+                },
+            )
+        )
+
+        await session.execute(statement)

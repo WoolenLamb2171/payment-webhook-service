@@ -14,3 +14,9 @@ class PaymentWebhook(BaseModel):
     user_id: int = Field(gt=0)
     amount: int = Field(gt=0)
     status: PaymentStatus
+
+
+class PaymentWebhookResponse(BaseModel):
+    status: str
+    payment_id: str | None = None
+    reason: str | None = None
