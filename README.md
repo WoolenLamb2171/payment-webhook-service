@@ -212,6 +212,17 @@ docker compose run --rm api uv run alembic upgrade head
 
 ---
 
+## Environment Variables
+
+Create a `.env` file based on `.env.example`.
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `WEBHOOK_SECRET` | Shared secret used to verify incoming webhook signatures |
+
+---
+
 ## Available endpoints
 
 API
