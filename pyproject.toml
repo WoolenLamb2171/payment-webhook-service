@@ -1,17 +1,17 @@
 [project]
 name = "payment-webhook-service"
 version = "0.1.0"
-description = "Add your description here"
+description = "Payment webhook processing service built with FastAPI and PostgreSQL"
 readme = "README.md"
 authors = [
     { name = "WoolenLamb2171", email = "romanmurtukov@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12,<3.13"
+
 dependencies = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.1",
 ]
 
-[build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false
