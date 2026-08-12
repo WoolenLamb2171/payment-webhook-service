@@ -20,10 +20,11 @@ app = FastAPI(
 async def health_check(
     session: AsyncSession = Depends(get_db_session),
 ):
+    await session.execute(text("SELECT 1"))
 
     return {
         "status": "ok",
-        "database_connected": True,
+        "database": "connected",
     }
 
 
