@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 
+from app.api.payment import router as payment_router
 
 app = FastAPI(
     title="Payment Webhook Service",
@@ -57,3 +58,5 @@ async def debug_schema(
         })
 
     return schema
+
+app.include_router(payment_router)
